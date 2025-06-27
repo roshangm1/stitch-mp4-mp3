@@ -56,27 +56,23 @@ function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audi
         command.input(videoPath);
         command.input(audioPath);
         
-        // Apply bass-reactive visual effects synchronized with audio
+        // Apply simpler bass-reactive effects that work reliably
         command
             .complexFilter([
-                // Create a cleaner spectrum visualization in the center
-                '[1:a]showspectrum=mode=separate:color=rainbow:scale=log:size=800x100:orientation=horizontal[spectrum]',
-                // Create bass-reactive zoom/bounce effect
-                '[0:v]scale=1280:720[scaled_video]',
-                // Apply bass-reactive scaling with subtle bounce
-                '[scaled_video]zoompan=z=\'1+0.05*sin(2*PI*t)\':d=1:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):s=1280x720[bouncing_video]',
-                // Enhance colors for better visual impact
-                '[bouncing_video]eq=brightness=0.08:contrast=1.15:saturation=1.25[enhanced_video]',
-                // Overlay the spectrum in the center bottom
-                '[enhanced_video][spectrum]overlay=(W-w)/2:H-h-50:alpha=0.7[final_video]'
+                // Create spectrum visualization
+                '[1:a]showspectrum=mode=separate:color=rainbow:scale=log:size=600x60[spectrum]',
+                // Scale and enhance video
+                '[0:v]scale=1280:720,eq=brightness=0.08:contrast=1.15:saturation=1.25[enhanced_video]',
+                // Overlay spectrum at bottom
+                '[enhanced_video][spectrum]overlay=(W-w)/2:H-h-20[final_video]'
             ])
             .outputOptions([
-                '-map', '[final_video]',     // Use processed video with effects
-                '-map', '1:a',               // Audio from second input
+                '-map', '[final_video]',
+                '-map', '1:a',
                 '-c:v libx264',
                 '-c:a aac',
                 '-strict experimental',
-                '-t', finalDuration.toString(), // Limit to shorter duration
+                '-t', finalDuration.toString(),
                 '-avoid_negative_ts make_zero'
             ]);
 
