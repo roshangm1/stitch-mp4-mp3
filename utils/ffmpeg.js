@@ -59,12 +59,16 @@ function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audi
         // Apply bass-reactive visual effects synchronized with audio
         command
             .complexFilter([
-                // Create audio visualization bars (frequency spectrum)
-                '[1:a]showfreqs=mode=bar:cmode=separate:size=640x360:colors=0x00ff00|0xff0000|0x0000ff:fscale=log:win_func=blackman[freq_viz]',
-                // Scale and enhance the video
-                '[0:v]scale=1280:720,eq=brightness=0.05:contrast=1.1:saturation=1.2[enhanced_video]',
-                // Overlay frequency visualization on video with transparency
-                '[enhanced_video][freq_viz]overlay=W-w-10:H-h-10:alpha=0.3[final_video]'
+                // Create a cleaner spectrum visualization in the center
+                '[1:a]showspectrum=mode=separate:color=rainbow:scale=log:size=800x100:orientation=horizontal[spectrum]',
+                // Create bass-reactive zoom/bounce effect
+                '[0:v]scale=1280:720[scaled_video]',
+                // Apply bass-reactive scaling with subtle bounce
+                '[scaled_video]zoompan=z=\'1+0.05*sin(2*PI*t)\':d=1:x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):s=1280x720[bouncing_video]',
+                // Enhance colors for better visual impact
+                '[bouncing_video]eq=brightness=0.08:contrast=1.15:saturation=1.25[enhanced_video]',
+                // Overlay the spectrum in the center bottom
+                '[enhanced_video][spectrum]overlay=(W-w)/2:H-h-50:alpha=0.7[final_video]'
             ])
             .outputOptions([
                 '-map', '[final_video]',     // Use processed video with effects
