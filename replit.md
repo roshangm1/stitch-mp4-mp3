@@ -90,7 +90,8 @@ The deployment uses a parallel workflow that installs dependencies and starts th
 
 ## Changelog
 
-- June 27, 2025. Initial setup
+- June 27, 2025: Initial setup with Express server, FFmpeg integration, and web interface
+- June 27, 2025: Fixed FFmpeg filter syntax error - replaced complex filter with stream_loop for video looping
 
 ## User Preferences
 

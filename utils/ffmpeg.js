@@ -48,44 +48,45 @@ function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audi
 
         let command = ffmpeg();
 
-        // Input video (muted)
-        command.input(videoPath);
-        
-        // Input audio
-        command.input(audioPath);
-
         // Video processing based on duration comparison
         if (videoDuration < audioDuration) {
             // Video is shorter than audio - loop the video
             console.log('Video is shorter than audio - looping video');
             
-            // Calculate how many times we need to loop
-            const loopCount = Math.ceil(audioDuration / videoDuration);
+            // Calculate how many loops we need
+            const loopCount = Math.ceil(audioDuration / videoDuration) - 1;
+            
+            // Input video with stream_loop option
+            command.input(videoPath)
+                .inputOptions(['-stream_loop', loopCount.toString()]);
+            
+            // Input audio
+            command.input(audioPath);
             
             command
-                .complexFilter([
-                    // Loop the video to match audio duration
-                    `[0:v]loop=loop=${loopCount - 1}:size=32767:start=0[looped_video]`,
-                    // Combine the looped video with audio
-                    '[looped_video][1:a]'
-                ])
                 .outputOptions([
+                    '-map', '0:v',  // Video from first input (looped)
+                    '-map', '1:a',  // Audio from second input
                     '-c:v libx264',
-                    '-c:a aac', 
+                    '-c:a aac',
                     '-strict experimental',
-                    '-shortest', // Stop when shortest stream ends
+                    '-t', audioDuration.toString(), // Limit to audio duration
                     '-avoid_negative_ts make_zero'
                 ]);
         } else {
             // Video is longer than or equal to audio - trim video
             console.log('Video is longer than or equal to audio - trimming video');
             
+            // Input video (no looping needed)
+            command.input(videoPath);
+            
+            // Input audio
+            command.input(audioPath);
+            
             command
-                .complexFilter([
-                    // Use video without original audio, trim to audio length
-                    '[0:v][1:a]'
-                ])
                 .outputOptions([
+                    '-map', '0:v',  // Video from first input
+                    '-map', '1:a',  // Audio from second input
                     '-c:v libx264',
                     '-c:a aac',
                     '-strict experimental',
