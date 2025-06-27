@@ -46,54 +46,30 @@ function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audi
     return new Promise((resolve, reject) => {
         console.log(`Combining video (${videoDuration}s) with audio (${audioDuration}s)`);
 
+        // Use the shorter duration for final output
+        const finalDuration = Math.min(videoDuration, audioDuration);
+        console.log(`Final video duration will be: ${finalDuration}s (shorter of the two)`);
+
         let command = ffmpeg();
 
-        // Video processing based on duration comparison
-        if (videoDuration < audioDuration) {
-            // Video is shorter than audio - loop the video
-            console.log('Video is shorter than audio - looping video');
-            
-            // Calculate how many loops we need
-            const loopCount = Math.ceil(audioDuration / videoDuration) - 1;
-            
-            // Input video with stream_loop option
-            command.input(videoPath)
-                .inputOptions(['-stream_loop', loopCount.toString()]);
-            
-            // Input audio
-            command.input(audioPath);
-            
-            command
-                .outputOptions([
-                    '-map', '0:v',  // Video from first input (looped)
-                    '-map', '1:a',  // Audio from second input
-                    '-c:v libx264',
-                    '-c:a aac',
-                    '-strict experimental',
-                    '-t', audioDuration.toString(), // Limit to audio duration
-                    '-avoid_negative_ts make_zero'
-                ]);
-        } else {
-            // Video is longer than or equal to audio - trim video
-            console.log('Video is longer than or equal to audio - trimming video');
-            
-            // Input video (no looping needed)
-            command.input(videoPath);
-            
-            // Input audio
-            command.input(audioPath);
-            
-            command
-                .outputOptions([
-                    '-map', '0:v',  // Video from first input
-                    '-map', '1:a',  // Audio from second input
-                    '-c:v libx264',
-                    '-c:a aac',
-                    '-strict experimental',
-                    '-t', audioDuration.toString(), // Limit to audio duration
-                    '-avoid_negative_ts make_zero'
-                ]);
-        }
+        // Input video and audio
+        command.input(videoPath);
+        command.input(audioPath);
+        
+        // Apply video inversion and combine with audio
+        command
+            .complexFilter([
+                '[0:v]negate[inverted_video]'  // Invert the video colors
+            ])
+            .outputOptions([
+                '-map', '[inverted_video]',  // Use inverted video
+                '-map', '1:a',               // Audio from second input
+                '-c:v libx264',
+                '-c:a aac',
+                '-strict experimental',
+                '-t', finalDuration.toString(), // Limit to shorter duration
+                '-avoid_negative_ts make_zero'
+            ]);
 
         // Set output format and quality
         command

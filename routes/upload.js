@@ -84,15 +84,18 @@ router.post('/process', upload.fields([
         // Send progress update (in a real implementation, you might use WebSocket for real-time updates)
         console.log('Processing completed successfully');
 
+        // Calculate final duration (shorter of the two)
+        const finalDuration = Math.min(videoDuration, audioDuration);
+
         // Send response with download link
         res.json({
             success: true,
-            message: 'Video processing completed successfully',
+            message: 'Video processing completed successfully with color inversion',
             downloadUrl: `/output/${outputFilename}`,
             filename: outputFilename,
             videoDuration: videoDuration,
             audioDuration: audioDuration,
-            finalDuration: audioDuration
+            finalDuration: finalDuration
         });
 
     } catch (error) {
