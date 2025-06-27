@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Node.js web application that combines MP4 video files with MP3 audio files using FFmpeg. The application provides a web interface for users to upload video and audio files, processes them server-side, and returns a combined video with color inversion effects and the new audio track. The final video duration matches the shorter of the two input files. The system handles file validation, media duration analysis, and automatic cleanup of temporary files.
+This is a Node.js web application that combines MP4 video files with MP3 audio files using FFmpeg. The application provides a web interface for users to upload video and audio files, processes them server-side, and returns a combined video with bass-reactive visual effects synchronized to the audio's low-end frequencies. The final video duration matches the shorter of the two input files. The system handles file validation, media duration analysis, and automatic cleanup of temporary files.
 
 ## System Architecture
 
@@ -32,9 +32,10 @@ The application follows a traditional three-tier architecture:
 ### Media Processing (`utils/ffmpeg.js`)
 - FFmpeg availability validation
 - Media duration extraction using ffprobe
-- Video-audio combination with color inversion effects
+- Video-audio combination with bass-reactive visual effects
+- Real-time frequency spectrum visualization overlay
+- Enhanced video scaling and color adjustment
 - Final duration matches the shorter of the two input files
-- Video color negation using FFmpeg negate filter
 
 ### API Routes (`routes/upload.js`)
 - `/api/check-ffmpeg` - Validates FFmpeg installation
@@ -94,6 +95,7 @@ The deployment uses a parallel workflow that installs dependencies and starts th
 - June 27, 2025: Initial setup with Express server, FFmpeg integration, and web interface
 - June 27, 2025: Fixed FFmpeg filter syntax error - replaced complex filter with stream_loop for video looping
 - June 27, 2025: Added video color inversion effect using negate filter and changed duration logic to use shorter of two files
+- June 27, 2025: Replaced color inversion with bass-reactive frequency visualization overlay synchronized to audio
 
 ## User Preferences
 

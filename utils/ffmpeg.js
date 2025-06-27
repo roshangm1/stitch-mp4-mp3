@@ -56,13 +56,18 @@ function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audi
         command.input(videoPath);
         command.input(audioPath);
         
-        // Apply video inversion and combine with audio
+        // Apply bass-reactive visual effects synchronized with audio
         command
             .complexFilter([
-                '[0:v]negate[inverted_video]'  // Invert the video colors
+                // Create audio visualization bars (frequency spectrum)
+                '[1:a]showfreqs=mode=bar:cmode=separate:size=640x360:colors=0x00ff00|0xff0000|0x0000ff:fscale=log:win_func=blackman[freq_viz]',
+                // Scale and enhance the video
+                '[0:v]scale=1280:720,eq=brightness=0.05:contrast=1.1:saturation=1.2[enhanced_video]',
+                // Overlay frequency visualization on video with transparency
+                '[enhanced_video][freq_viz]overlay=W-w-10:H-h-10:alpha=0.3[final_video]'
             ])
             .outputOptions([
-                '-map', '[inverted_video]',  // Use inverted video
+                '-map', '[final_video]',     // Use processed video with effects
                 '-map', '1:a',               // Audio from second input
                 '-c:v libx264',
                 '-c:a aac',

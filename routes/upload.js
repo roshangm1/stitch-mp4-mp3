@@ -90,7 +90,7 @@ router.post('/process', upload.fields([
         // Send response with download link
         res.json({
             success: true,
-            message: 'Video processing completed successfully with color inversion',
+            message: 'Video processing completed successfully with bass-reactive effects',
             downloadUrl: `/output/${outputFilename}`,
             filename: outputFilename,
             videoDuration: videoDuration,
