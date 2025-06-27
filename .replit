@@ -2,6 +2,7 @@ modules = ["nodejs-20"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["ffmpeg"]
 
 [workflows]
 runButton = "Project"
@@ -23,3 +24,11 @@ author = "agent"
 task = "shell.exec"
 args = "npm install express multer fluent-ffmpeg uuid cors && node server.js"
 waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
+localPort = 8000
+externalPort = 80
