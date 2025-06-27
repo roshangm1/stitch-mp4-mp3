@@ -1,0 +1,25 @@
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Video Audio Combiner Server"
+
+[[workflows.workflow]]
+name = "Video Audio Combiner Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install express multer fluent-ffmpeg uuid cors && node server.js"
+waitForPort = 5000

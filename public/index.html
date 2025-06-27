@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Audio Combiner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .drop-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .drop-zone:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .drop-zone.drag-over {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .result-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .error-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .files-list {
+            margin-top: 30px;
+        }
+        .btn-custom {
+            border-radius: 25px;
+            padding: 10px 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="text-center mb-5">
+                    <h1 class="display-4 mb-3">
+                        <i class="fas fa-video text-primary"></i>
+                        Video Audio Combiner
+                    </h1>
+                    <p class="lead text-muted">
+                        Upload an MP4 video and MP3 audio file to combine them into a single video
+                    </p>
+                </div>
+
+                <!-- FFmpeg Status Check -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-tools"></i> System Status
+                        </h5>
+                        <div id="ffmpeg-status">
+                            <button class="btn btn-outline-primary btn-sm" onclick="checkFFmpeg()">
+                                <i class="fas fa-refresh"></i> Check FFmpeg
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Form -->
+                <div class="card">
+                    <div class="card-body">
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-video text-primary"></i> 
+                                        Video File (MP4)
+                                    </h5>
+                                    <div class="drop-zone" id="video-drop-zone">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                        <p class="mb-2">Drag & drop your MP4 video here</p>
+                                        <p class="text-muted">or click to select</p>
+                                        <input type="file" id="video-input" name="video" accept=".mp4,video/mp4" hidden>
+                                    </div>
+                                    <div id="video-info" class="file-info" style="display: none;"></div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-music text-success"></i> 
+                                        Audio File (MP3)
+                                    </h5>
+                                    <div class="drop-zone" id="audio-drop-zone">
+                                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                        <p class="mb-2">Drag & drop your MP3 audio here</p>
+                                        <p class="text-muted">or click to select</p>
+                                        <input type="file" id="audio-input" name="audio" accept=".mp3,audio/mp3,audio/mpeg" hidden>
+                                    </div>
+                                    <div id="audio-info" class="file-info" style="display: none;"></div>
+                                </div>
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg btn-custom" disabled>
+                                    <i class="fas fa-magic"></i> Combine Video & Audio
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Progress -->
+                        <div class="progress-container">
+                            <div class="text-center mb-3">
+                                <h5>Processing your video...</h5>
+                                <p class="text-muted">This may take a few minutes depending on file sizes</p>
+                            </div>
+                            <div class="progress mb-3">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     style="width: 0%"></div>
+                            </div>
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Result -->
+                        <div class="result-container">
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-check-circle"></i> Processing Complete!</h5>
+                                <p class="mb-3">Your video has been successfully processed.</p>
+                                <div id="result-info"></div>
+                                <div class="mt-3">
+                                    <a id="download-link" class="btn btn-success btn-custom" href="#" download>
+                                        <i class="fas fa-download"></i> Download Processed Video
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error -->
+                        <div class="error-container">
+                            <div class="alert alert-danger">
+                                <h5><i class="fas fa-exclamation-triangle"></i> Processing Failed</h5>
+                                <p id="error-message">An error occurred while processing your files.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Files -->
+                <div class="files-list">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-history"></i> Recent Files
+                                </h5>
+                                <button class="btn btn-outline-danger btn-sm" onclick="cleanupFiles()">
+                                    <i class="fas fa-trash"></i> Cleanup Old Files
+                                </button>
+                            </div>
+                            <div id="files-list-content">
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadFiles()">
+                                    <i class="fas fa-refresh"></i> Load Files
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let selectedVideoFile = null;
+        let selectedAudioFile = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDropZones();
+            checkFFmpeg();
+            loadFiles();
+        });
+
+        // Setup drag and drop zones
+        function setupDropZones() {
+            setupDropZone('video-drop-zone', 'video-input', handleVideoFile);
+            setupDropZone('audio-drop-zone', 'audio-input', handleAudioFile);
+        }
+
+        function setupDropZone(dropZoneId, inputId, fileHandler) {
+            const dropZone = document.getElementById(dropZoneId);
+            const input = document.getElementById(inputId);
+
+            // Click to select
+            dropZone.addEventListener('click', () => input.click());
+            
+            // File input change
+            input.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    fileHandler(e.target.files[0]);
+                }
+            });
+
+            // Drag and drop events
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    fileHandler(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // Handle video file selection
+        function handleVideoFile(file) {
+            if (!file.type.includes('video/mp4') && !file.name.toLowerCase().endsWith('.mp4')) {
+                alert('Please select an MP4 video file');
+                return;
+            }
+
+            selectedVideoFile = file;
+            document.getElementById('video-input').files = createFileList(file);
+            
+            const info = document.getElementById('video-info');
+            info.innerHTML = `
+                <strong>${file.name}</strong><br>
+                <small class="text-muted">Size: ${formatFileSize(file.size)}</small>
+            `;
+            info.style.display = 'block';
+
+            checkFormReady();
+        }
+
+        // Handle audio file selection
+        function handleAudioFile(file) {
+            if (!file.type.includes('audio') && !file.name.toLowerCase().endsWith('.mp3')) {
+                alert('Please select an MP3 audio file');
+                return;
+            }
+
+            selectedAudioFile = file;
+            document.getElementById('audio-input').files = createFileList(file);
+            
+            const info = document.getElementById('audio-info');
+            info.innerHTML = `
+                <strong>${file.name}</strong><br>
+                <small class="text-muted">Size: ${formatFileSize(file.size)}</small>
+            `;
+            info.style.display = 'block';
+
+            checkFormReady();
+        }
+
+        // Create FileList object for drag and drop
+        function createFileList(file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            return dt.files;
+        }
+
+        // Check if form is ready for submission
+        function checkFormReady() {
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = !(selectedVideoFile && selectedAudioFile);
+        }
+
+        // Handle form submission
+        document.getElementById('upload-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!selectedVideoFile || !selectedAudioFile) {
+                alert('Please select both video and audio files');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', selectedVideoFile);
+            formData.append('audio', selectedAudioFile);
+
+            showProgress(true);
+            hideContainers(['result-container', 'error-container']);
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showResult(result);
+                    loadFiles(); // Refresh files list
+                } else {
+                    showError(result.message || 'Processing failed');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showError('Network error: ' + error.message);
+            } finally {
+                showProgress(false);
+            }
+        });
+
+        // Show/hide progress
+        function showProgress(show) {
+            document.querySelector('.progress-container').style.display = show ? 'block' : 'none';
+        }
+
+        // Show result
+        function showResult(result) {
+            const container = document.querySelector('.result-container');
+            const info = document.getElementById('result-info');
+            const downloadLink = document.getElementById('download-link');
+
+            info.innerHTML = `
+                <strong>Processing Details:</strong><br>
+                <small>
+                    Original video duration: ${result.videoDuration}s<br>
+                    Audio duration: ${result.audioDuration}s<br>
+                    Final video duration: ${result.finalDuration}s
+                </small>
+            `;
+
+            downloadLink.href = result.downloadUrl;
+            downloadLink.download = result.filename;
+            
+            container.style.display = 'block';
+        }
+
+        // Show error
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.querySelector('.error-container').style.display = 'block';
+        }
+
+        // Hide containers
+        function hideContainers(containerClasses) {
+            containerClasses.forEach(className => {
+                document.querySelector('.' + className).style.display = 'none';
+            });
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Check FFmpeg availability
+        async function checkFFmpeg() {
+            try {
+                const response = await fetch('/api/check-ffmpeg');
+                const result = await response.json();
+                
+                const statusDiv = document.getElementById('ffmpeg-status');
+                const statusClass = result.available ? 'success' : 'danger';
+                const statusIcon = result.available ? 'check-circle' : 'exclamation-triangle';
+                
+                statusDiv.innerHTML = `
+                    <div class="alert alert-${statusClass} py-2 mb-0">
+                        <i class="fas fa-${statusIcon}"></i> ${result.message}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error checking FFmpeg:', error);
+            }
+        }
+
+        // Load files list
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                const result = await response.json();
+                
+                const container = document.getElementById('files-list-content');
+                
+                if (result.success && result.files.length > 0) {
+                    container.innerHTML = result.files.map(file => `
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                            <div>
+                                <strong>${file.filename}</strong><br>
+                                <small class="text-muted">
+                                    ${formatFileSize(file.size)} • 
+                                    ${new Date(file.created).toLocaleString()}
+                                </small>
+                            </div>
+                            <a href="${file.downloadUrl}" class="btn btn-outline-primary btn-sm" download>
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p class="text-muted">No processed files found</p>';
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        // Cleanup old files
+        async function cleanupFiles() {
+            if (!confirm('This will delete files older than 1 day. Continue?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/cleanup', { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Cleaned up ${result.deletedCount} old files`);
+                    loadFiles(); // Refresh list
+                } else {
+                    alert('Cleanup failed: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Cleanup error:', error);
+                alert('Cleanup failed: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
