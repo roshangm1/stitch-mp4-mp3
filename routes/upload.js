@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const upload = require('../middleware/upload');
-const { combineVideoAudio, getMediaDuration, validateFFmpeg } = require('../utils/ffmpeg');
+const { combineVideoAudio, combineForKKVideos, getMediaDuration, validateFFmpeg } = require('../utils/ffmpeg');
 
 const router = express.Router();
 
@@ -29,6 +29,8 @@ router.post('/process', upload.fields([
     { name: 'audio', maxCount: 1 }
 ]), async (req, res) => {
     let tempFiles = [];
+    let outputPath = null;
+    const isPortrait = req.body.portrait;
     
     try {
         // Validate files are uploaded
@@ -67,13 +69,25 @@ router.post('/process', upload.fields([
 
         console.log(`Video duration: ${videoDuration}s, Audio duration: ${audioDuration}s`);
 
-        // Generate output filename
-        const outputFilename = `processed_${uuidv4()}.mp4`;
-        const outputPath = path.join('output', outputFilename);
+        // Create temp directory if it doesn't exist
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Generate temporary output path
+        const outputFilename = `temp_${Date.now()}_${uuidv4()}.mp4`;
+        outputPath = path.join(tempDir, outputFilename);
         tempFiles.push(outputPath);
 
-        // Process the files
-        await combineVideoAudio(
+        // Process the files and get binary data directly
+        const processedVideo = isPortrait ? await combineForKKVideos(
+            videoFile.path,
+            audioFile.path,
+            outputPath,
+            videoDuration,
+            audioDuration
+        ) : await combineVideoAudio(
             videoFile.path,
             audioFile.path,
             outputPath,
@@ -81,22 +95,12 @@ router.post('/process', upload.fields([
             audioDuration
         );
 
-        // Send progress update (in a real implementation, you might use WebSocket for real-time updates)
-        console.log('Processing completed successfully');
-
-        // Calculate final duration (shorter of the two)
-        const finalDuration = Math.min(videoDuration, audioDuration);
-
-        // Send response with download link
-        res.json({
-            success: true,
-            message: 'Video processing completed successfully with bass-reactive effects',
-            downloadUrl: `/output/${outputFilename}`,
-            filename: outputFilename,
-            videoDuration: videoDuration,
-            audioDuration: audioDuration,
-            finalDuration: finalDuration
-        });
+        // Set headers for binary video response
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="processed_${path.basename(videoFile.originalname)}"`);
+        
+        // Send the binary data directly
+        res.send(processedVideo);
 
     } catch (error) {
         console.error('Processing error:', error);
@@ -106,18 +110,17 @@ router.post('/process', upload.fields([
             message: error.message || 'An error occurred while processing the files'
         });
     } finally {
-        // Clean up temporary upload files (but keep output file)
-        tempFiles.forEach((filePath, index) => {
-            // Don't delete the output file (last item)
-            if (index < tempFiles.length - 1 && fs.existsSync(filePath)) {
+        // Clean up all temporary files
+        for (const filePath of tempFiles) {
+            if (fs.existsSync(filePath)) {
                 try {
                     fs.unlinkSync(filePath);
-                    console.log(`Cleaned up temporary file: ${filePath}`);
+                    console.log(`Cleaned up file: ${filePath}`);
                 } catch (cleanupError) {
                     console.error(`Failed to cleanup file ${filePath}:`, cleanupError);
                 }
             }
-        });
+        }
     }
 });
 

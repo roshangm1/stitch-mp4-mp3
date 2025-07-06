@@ -1,6 +1,8 @@
 const ffmpeg = require('fluent-ffmpeg');
 const { exec } = require('child_process');
 const util = require('util');
+const fs = require('fs');
+const path = require('path');
 
 const execPromise = util.promisify(exec);
 
@@ -15,6 +17,102 @@ async function validateFFmpeg() {
         console.error('FFmpeg not found:', error.message);
         return false;
     }
+}
+
+function combineForKKVideos(videoPath, audioPath, outputPath, videoDuration, audioDuration) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            console.log('\n=== Starting Video Processing ===');
+            console.log(`Input Video Path: ${videoPath}`);
+            console.log(`Input Audio Path: ${audioPath}`);
+            console.log(`Output Path: ${outputPath}`);
+            console.log(`Video Duration: ${videoDuration}s`);
+            console.log(`Audio Duration: ${audioDuration}s`);
+
+            // Use the shorter duration for final output
+            const finalDuration = Math.min(videoDuration, audioDuration);
+            console.log(`Final video duration will be: ${finalDuration}s (shorter of the two)\n`);
+
+            // Verify input files exist
+            if (!fs.existsSync(videoPath)) {
+                throw new Error(`Video file not found: ${videoPath}`);
+            }
+            if (!fs.existsSync(audioPath)) {
+                throw new Error(`Audio file not found: ${audioPath}`);
+            }
+
+            let command = ffmpeg();
+
+            // Input video and audio
+            command.input(videoPath);
+            command.input(audioPath);
+        
+            console.log('Setting up FFmpeg filters for 9:16 portrait video with padding...');
+            // Apply padding to maintain aspect ratio
+            command
+                .complexFilter([
+                    // Scale video to fit within 720x1280 while maintaining aspect ratio
+                    // Then pad to 720x1280 with black bars as needed
+                    '[0:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2[final_video]'
+                ])
+                .output(outputPath)
+                .outputOptions([
+                    '-map', '[final_video]',
+                    '-map', '1:a',
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-preset', 'fast',
+                    '-crf', '23',
+                    '-t', finalDuration.toString()
+                ])
+                .on('start', (commandLine) => {
+                    console.log('\n=== FFmpeg Command ===');
+                    console.log(commandLine);
+                    console.log('\n=== Processing Started ===');
+                })
+                .on('progress', (progress) => {
+                    const percent = Math.round(progress.percent || 0);
+                    const timemark = progress.timemark || '00:00:00';
+                    console.log(`Progress: ${percent}% complete (Time: ${timemark})`);
+                    if (progress.currentFps) {
+                        console.log(`Current FPS: ${progress.currentFps}`);
+                    }
+                })
+                .on('end', async () => {
+                    try {
+                        console.log('\n=== Video Processing Complete ===');
+                        const fileStats = fs.statSync(outputPath);
+                        console.log(`Output file size: ${(fileStats.size / 1024 / 1024).toFixed(2)} MB`);
+                        
+                        // Read the processed file as binary
+                        console.log('Reading processed file...');
+                        const processedVideo = await fs.promises.readFile(outputPath);
+                        console.log('File read successfully');
+                        resolve(processedVideo);
+                    } catch (error) {
+                        console.error('\n=== Error Reading Output File ===');
+                        console.error('Error details:', error);
+                        reject(new Error(`Failed to read processed video: ${error.message}`));
+                    }
+                })
+                .on('error', (err, stdout, stderr) => {
+                    console.error('\n=== FFmpeg Processing Error ===');
+                    console.error('Error:', err.message);
+                    if (stdout) {
+                        console.error('\nFFmpeg stdout:', stdout);
+                    }
+                    if (stderr) {
+                        console.error('\nFFmpeg stderr:', stderr);
+                    }
+                    reject(new Error(`Video processing failed: ${err.message}`));
+                })
+                .run();
+        } catch (error) {
+            console.error('\n=== Processing Setup Error ===');
+            console.error('Error details:', error);
+            reject(new Error(`Processing setup failed: ${error.message}`));
+        }
+    });
 }
 
 /**
@@ -41,64 +139,66 @@ function getMediaDuration(filePath) {
 
 /**
  * Combine video and audio, adjusting video length to match audio
+ * Returns the processed video as binary data
  */
 function combineVideoAudio(videoPath, audioPath, outputPath, videoDuration, audioDuration) {
-    return new Promise((resolve, reject) => {
-        console.log(`Combining video (${videoDuration}s) with audio (${audioDuration}s)`);
+    return new Promise(async (resolve, reject) => {
+        try {
+            console.log(`Combining video (${videoDuration}s) with audio (${audioDuration}s)`);
 
-        // Use the shorter duration for final output
-        const finalDuration = Math.min(videoDuration, audioDuration);
-        console.log(`Final video duration will be: ${finalDuration}s (shorter of the two)`);
+            // Use the shorter duration for final output
+            const finalDuration = Math.min(videoDuration, audioDuration);
+            console.log(`Final video duration will be: ${finalDuration}s (shorter of the two)`);
 
-        let command = ffmpeg();
+            let command = ffmpeg();
 
-        // Input video and audio
-        command.input(videoPath);
-        command.input(audioPath);
+            // Input video and audio
+            command.input(videoPath);
+            command.input(audioPath);
         
-        // Apply simpler bass-reactive effects that work reliably
-        command
-            .complexFilter([
-                // Create spectrum visualization
-                '[1:a]showspectrum=mode=separate:color=rainbow:scale=log:size=600x60[spectrum]',
-                // Scale and enhance video
-                '[0:v]scale=1280:720,eq=brightness=0.08:contrast=1.15:saturation=1.25[enhanced_video]',
-                // Overlay spectrum at bottom
-                '[enhanced_video][spectrum]overlay=(W-w)/2:H-h-20[final_video]'
-            ])
-            .outputOptions([
-                '-map', '[final_video]',
-                '-map', '1:a',
-                '-c:v libx264',
-                '-c:a aac',
-                '-strict experimental',
-                '-t', finalDuration.toString(),
-                '-avoid_negative_ts make_zero'
-            ]);
-
-        // Set output format and quality
-        command
-            .output(outputPath)
-            .outputOptions([
-                '-preset fast',
-                '-crf 23', // Good quality/size balance
-                '-movflags +faststart' // Optimize for web streaming
-            ])
-            .on('start', (commandLine) => {
-                console.log('FFmpeg command:', commandLine);
-            })
-            .on('progress', (progress) => {
-                console.log(`Processing: ${Math.round(progress.percent || 0)}% done`);
-            })
-            .on('end', () => {
-                console.log('Video processing completed successfully');
-                resolve();
-            })
-            .on('error', (err) => {
-                console.error('FFmpeg error:', err);
-                reject(new Error(`Video processing failed: ${err.message}`));
-            })
-            .run();
+            // Apply simple video enhancement and bounce effect
+            command
+                .complexFilter([
+                    // Basic video enhancement
+                    '[0:v]scale=1280:720[scaled]',
+                    '[scaled]eq=brightness=0.2:contrast=1.5:saturation=1.8[enhanced]',
+                    // Simple bounce effect
+                    '[enhanced]scale=1280:720,setpts=PTS-STARTPTS[final_video]'
+                ])
+                .output(outputPath)
+                .outputOptions([
+                    '-map', '[final_video]',
+                    '-map', '1:a',
+                    '-c:v libx264',
+                    '-c:a aac',
+                    '-preset fast',
+                    '-crf 23',
+                    '-t', finalDuration.toString()
+                ])
+                .on('start', (commandLine) => {
+                    console.log('FFmpeg command:', commandLine);
+                })
+                .on('progress', (progress) => {
+                    console.log(`Processing: ${Math.round(progress.percent || 0)}% done`);
+                })
+                .on('end', async () => {
+                    try {
+                        console.log('Video processing completed successfully');
+                        // Read the processed file as binary
+                        const processedVideo = await fs.promises.readFile(outputPath);
+                        resolve(processedVideo);
+                    } catch (error) {
+                        reject(new Error(`Failed to read processed video: ${error.message}`));
+                    }
+                })
+                .on('error', (err) => {
+                    console.error('FFmpeg error:', err);
+                    reject(new Error(`Video processing failed: ${err.message}`));
+                })
+                .run();
+        } catch (error) {
+            reject(new Error(`Processing setup failed: ${error.message}`));
+        }
     });
 }
 
@@ -153,5 +253,6 @@ module.exports = {
     combineVideoAudio,
     getMediaInfo,
     extractAudio,
-    muteVideo
+    muteVideo,
+    combineForKKVideos
 };
